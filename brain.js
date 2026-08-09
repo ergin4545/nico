@@ -1,456 +1,187 @@
-// ======================================================
-// NICO AI - BRAIN.JS
-// Gemini bağlantısı Cloudflare Worker üzerinden
-// API anahtarı BU DOSYADA BULUNMAZ.
-// ======================================================
-
-const WORKER_URL =
-    "https://bitter-haze-2503.usermame5252.workers.dev/";
-
-
-// ======================================================
-// NICO KOMUTLARI
-// ======================================================
+const WORKER_URL = "https://bitter-haze-2503.usermame5252.workers.dev";
 
 async function brainCommand(t) {
-
-    t = String(t || "").trim();
-
-    // --------------------------------------------------
-    // Worker adresini değiştirme
-    // Örnek:
-    // WORKER:https://ornek.workers.dev
-    // --------------------------------------------------
-
-    if (t.indexOf("WORKER:") === 0) {
-
-        const url = t.slice(7).trim();
-
-        if (!url) {
-            return "Worker adresi boş Reis.";
-        }
-
-        localStorage.setItem("nico_worker", url);
-
-        return "NICO Worker bağlantısı kaydedildi Reis 🧠";
+    if (t.indexOf("G-KEY:") === 0) {
+        return "API anahtarı artık Worker üzerinden kullanılıyor Reis 🧠";
     }
 
-
-    // --------------------------------------------------
-    // HAVA DURUMU
-    // Kullanım:
-    // hava Manisa
-    // --------------------------------------------------
-
-    if (t.toLowerCase().indexOf("hava ") === 0) {
-
-        try {
-
-            const city = t.slice(5).trim();
-
-            const geoResponse = await fetch(
-                "https://geocoding-api.open-meteo.com/v1/search?name=" +
-                encodeURIComponent(city) +
-                "&count=1&language=tr&format=json"
-            );
-
-            const geo = await geoResponse.json();
-
-            if (!geo.results || !geo.results.length) {
-                return "Bu şehri bulamadım Reis 🌍";
-            }
-
-            const p = geo.results[0];
-
-            const weatherResponse = await fetch(
-                "https://api.open-meteo.com/v1/forecast?latitude=" +
-                p.latitude +
-                "&longitude=" +
-                p.longitude +
-                "&current=temperature_2m,weather_code,wind_speed_10m&timezone=auto"
-            );
-
-            const weather = await weatherResponse.json();
-
-            const current = weather.current;
-
-            const code = current.weather_code;
-
-            let durum = "bilinmiyor";
-
-            if (code === 0) {
-                durum = "açık ☀️";
-            }
-            else if (code <= 3) {
-                durum = "bulutlu 🌤️";
-            }
-            else if (code <= 48) {
-                durum = "sisli 🌫️";
-            }
-            else if (code <= 67) {
-                durum = "yağmurlu 🌧️";
-            }
-            else if (code <= 77) {
-                durum = "karlı ❄️";
-            }
-            else if (code <= 82) {
-                durum = "sağanak yağışlı 🌧️";
-            }
-            else if (code <= 86) {
-                durum = "kar yağışlı ❄️";
-            }
-            else {
-                durum = "gök gürültülü ⛈️";
-            }
-
-            return (
-                "📍 " + p.name +
-                "\n🌡️ Sıcaklık: " +
-                current.temperature_2m +
-                "°C" +
-                "\n🌤️ Durum: " +
-                durum +
-                "\n💨 Rüzgar: " +
-                current.wind_speed_10m +
-                " km/s"
-            );
-
-        }
-        catch (e) {
-
-            return "Hava bilgisine ulaşamadım Reis 🌤️";
-        }
+    if (t.indexOf("OR-KEY:") === 0) {
+        return "Yedek API anahtarı bu sürümde Worker üzerinden yönetiliyor Reis 🧠";
     }
 
-
-    // --------------------------------------------------
-    // WIKIPEDIA ARAMA
-    // Kullanım:
-    // ara Türkiye
-    // --------------------------------------------------
-
-    if (t.toLowerCase().indexOf("ara ") === 0) {
-
+    if (t.indexOf("hava ") === 0) {
         try {
+            const g = await (
+                await fetch(
+                    "https://geocoding-api.open-meteo.com/v1/search?name=" +
+                    encodeURIComponent(t.slice(5)) +
+                    "&count=1&language=tr"
+                )
+            ).json();
 
-            const query = t.slice(4).trim();
+            if (g.results && g.results[0]) {
+                const p = g.results[0];
 
-            const response = await fetch(
-                "https://tr.wikipedia.org/w/api.php?action=query&list=search&srsearch=" +
-                encodeURIComponent(query) +
-                "&format=json&origin=*"
-            );
+                const w = await (
+                    await fetch(
+                        "https://api.open-meteo.com/v1/forecast?latitude=" +
+                        p.latitude +
+                        "&longitude=" +
+                        p.longitude +
+                        "&current_weather=true"
+                    )
+                ).json();
 
-            const data = await response.json();
+                const cw = w.current_weather;
 
-            if (
-                data.query &&
-                data.query.search &&
-                data.query.search.length
-            ) {
+                let d = "bilinmiyor";
+                if (cw.weathercode === 0) d = "açık ☀️";
+                else if (cw.weathercode < 3) d = "az bulutlu 🌤️";
+                else if (cw.weathercode < 45) d = "kapalı ☁️";
+                else if (cw.weathercode < 51) d = "sisli 🌫️";
+                else if (cw.weathercode < 71) d = "yağmurlu 🌧️";
+                else if (cw.weathercode < 95) d = "karlı ❄️";
+                else d = "gök gürültülü ⛈️";
 
-                const result = data.query.search[0];
+                return p.name + ": " + cw.temperature + "°C, " + d;
+            }
+        } catch (e) {}
 
-                const snippet = result.snippet
-                    .replace(/<[^>]*>/g, "");
+        return "Hava bilgisi alınamadı Reis 🌤️";
+    }
 
+    if (t.indexOf("ara ") === 0) {
+        try {
+            const s = await (
+                await fetch(
+                    "https://tr.wikipedia.org/w/api.php?action=query&list=search&srsearch=" +
+                    encodeURIComponent(t.slice(4)) +
+                    "&format=json&origin=*"
+                )
+            ).json();
+
+            const r = s.query && s.query.search
+                ? s.query.search[0]
+                : null;
+
+            if (r) {
                 return (
                     "📚 " +
-                    result.title +
-                    "\n\n" +
-                    snippet
+                    r.title +
+                    ": " +
+                    r.snippet.replace(/<[^>]+>/g, "")
                 );
             }
+        } catch (e) {}
 
-        }
-        catch (e) {}
-
-        return "Aramada sonuç bulamadım Reis 📚";
+        return "Bulamadım Reis 📚";
     }
-
-
-    // --------------------------------------------------
-    // MODLAR
-    // --------------------------------------------------
 
     if (/^mod asistan/i.test(t)) {
-
-        localStorage.setItem(
-            "nico_mode",
-            "asistan"
-        );
-
-        return "Profesyonel Asistan modu aktif Reis 💼";
+        return "Asistan modu aktif Reis 💼";
     }
-
 
     if (/^mod dost/i.test(t)) {
-
-        localStorage.setItem(
-            "nico_mode",
-            "dost"
-        );
-
         return "Dost modu aktif Reis 😎";
     }
-
 
     return null;
 }
 
 
-// ======================================================
-// GERÇEK YAPAY ZEKA
-// NICO → CLOUDFLARE WORKER → GEMINI
-// ======================================================
+async function askBrain(msgs, vision, notes) {
 
-async function askBrain(
-    msgs,
-    vision,
-    notes
-) {
+    const mode = "dost";
 
-    let worker =
-        localStorage.getItem("nico_worker") ||
-        WORKER_URL;
+    const system =
+        "Sen NICO adında gelişmiş bir yapay zeka asistanısın. " +
+        "Kurucun Sidar Aydın'dır. " +
+        "Türkçe konuş. " +
+        "Kullanıcıya Reis diye hitap edebilirsin. " +
+        "Samimi, zeki, doğal ve yardımcı ol. " +
+        "Gerektiğinde ayrıntılı cevap ver. " +
+        "Kod yazabilir, açıklama yapabilir ve fikir üretebilirsin. " +
+        "Kısa ama faydalı cevaplar ver. " +
+        "Kullanıcının notları: " +
+        (notes || "yok");
 
-
-    if (
-        !worker ||
-        worker === "BURAYA_CLOUDFLARE_WORKER_URL"
-    ) {
-
-        return {
-            text: null,
-            err: "NICO Worker adresi ayarlanmamış Reis."
-        };
-    }
-
-
-    worker = worker.trim();
-
-    // URL sonunda / varsa kaldır
-    worker = worker.replace(/\/+$/, "");
-
-
-    // --------------------------------------------------
-    // NICO MODU
-    // --------------------------------------------------
-
-    const mode =
-        localStorage.getItem("nico_mode") ||
-        "dost";
-
-
-    // --------------------------------------------------
-    // SİSTEM MESAJI
-    // --------------------------------------------------
-
-    const systemMessage = {
-
-        role: "system",
-
-        content:
-            "Sen NICO adında gelişmiş bir Türkçe yapay zeka asistanısın. " +
-
-            "Kurucun Sidar Aydın'dır. " +
-
-            "Kullanıcıya gerektiğinde Reis diye hitap edebilirsin. " +
-
-            "Samimi, doğal, akıllı ve yardımcı ol. " +
-
-            "Soruyu gerçekten anlamaya çalış. " +
-
-            "Bilmediğin bilgiyi uydurma. " +
-
-            "Kod istenirse eksiksiz ve çalışabilir kod üret. " +
-
-            "Türkçe konuş. " +
-
-            "Mod: " +
-            mode +
-            ". " +
-
-            "Kullanıcı hafızası: " +
-            (notes || "yok")
-    };
-
-
-    // --------------------------------------------------
-    // MESAJLARI HAZIRLA
-    // --------------------------------------------------
-
-    const messages = [
-        systemMessage
-    ];
-
-
-    for (
-        let index = 0;
-        index < msgs.length;
-        index++
-    ) {
-
-        const m = msgs[index];
-
-        if (!m) continue;
-
-
-        let content = m.content;
-
-
-        // String değilse dönüştür
-        if (typeof content !== "string") {
-
-            if (Array.isArray(content)) {
-
-                let text = "";
-
-                for (
-                    let j = 0;
-                    j < content.length;
-                    j++
-                ) {
-
-                    const part = content[j];
-
-                    if (
-                        part &&
-                        part.type === "text"
-                    ) {
-
-                        text +=
-                            part.text +
-                            "\n";
-                    }
-                }
-
-                content = text.trim();
-
-            }
-            else {
-
-                content = "";
-            }
-        }
-
-
-        messages.push({
-
-            role:
-                m.role === "assistant"
-                    ? "assistant"
-                    : "user",
-
-            content:
-                content || ""
-        });
-    }
-
-
-    // --------------------------------------------------
-    // CLOUDFLARE WORKER'A GÖNDER
-    // --------------------------------------------------
 
     try {
 
         const response = await fetch(
-            worker,
+            WORKER_URL + "/api/chat",
             {
-
                 method: "POST",
 
                 headers: {
-                    "Content-Type":
-                        "application/json"
+                    "Content-Type": "application/json"
                 },
 
                 body: JSON.stringify({
+                    system: system,
 
-                    messages: messages,
+                    messages: msgs.map(function (m) {
 
-                    vision:
-                        !!vision
+                        let content = m.content;
 
+                        if (typeof content !== "string") {
+                            content =
+                                content
+                                    .map(function (x) {
+                                        return x.text || "";
+                                    })
+                                    .join("\n");
+                        }
+
+                        return {
+                            role:
+                                m.role === "assistant"
+                                    ? "assistant"
+                                    : "user",
+
+                            content: content
+                        };
+                    })
                 })
             }
         );
 
 
-        let data;
+        const data = await response.json();
 
-
-        try {
-
-            data =
-                await response.json();
-
-        }
-        catch (e) {
-
-            return {
-
-                text: null,
-
-                err:
-                    "Worker geçerli cevap vermedi. HTTP " +
-                    response.status
-            };
-        }
-
-
-        // ------------------------------------------------
-        // WORKER HATASI
-        // ------------------------------------------------
 
         if (!response.ok) {
 
             return {
+                text: null,
 
+                err:
+                    "NICO Worker hatası: " +
+                    (data.error || response.status)
+            };
+        }
+
+
+        if (!data.ok || !data.text) {
+
+            return {
                 text: null,
 
                 err:
                     data.error ||
-                    (
-                        "Worker HTTP " +
-                        response.status
-                    )
-            };
-        }
-
-
-        // ------------------------------------------------
-        // GEMINI CEVABI
-        // ------------------------------------------------
-
-        if (
-            data &&
-            data.text
-        ) {
-
-            return {
-
-                text: data.text,
-
-                err: null
+                    "NICO cevap alamadı."
             };
         }
 
 
         return {
-
-            text: null,
-
-            err:
-                "Gemini boş cevap verdi Reis."
+            text: data.text
         };
 
 
-    }
-    catch (e) {
+    } catch (e) {
 
         return {
-
             text: null,
 
             err:
@@ -459,42 +190,3 @@ async function askBrain(
         };
     }
 }
-
-
-// ======================================================
-// TEST
-// ======================================================
-
-async function testNicoBrain() {
-
-    const result =
-        await askBrain(
-
-            [
-                {
-                    role: "user",
-
-                    content:
-                        "Merhaba NICO"
-                }
-            ],
-
-            false,
-
-            ""
-        );
-
-
-    console.log(
-        "NICO BRAIN TEST:",
-        result
-    );
-
-
-    return result;
-}
-
-
-// ======================================================
-// NICO BRAIN SON
-// ======================================================
