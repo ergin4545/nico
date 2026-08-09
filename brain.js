@@ -8,7 +8,6 @@ var G = localStorage.getItem("nico_g") || "";
 async function brainCommand(t) {
 
     if (t.indexOf("G-KEY:") === 0) {
-
         var key = t.slice(6).trim();
 
         if (!key) {
@@ -16,15 +15,12 @@ async function brainCommand(t) {
         }
 
         localStorage.setItem("nico_g", key);
-
         G = key;
 
         return "Gemini beyni bağlandı Reis 🧠";
     }
 
-
     if (t.indexOf("OR-KEY:") === 0) {
-
         var key2 = t.slice(7).trim();
 
         if (!key2) {
@@ -32,117 +28,81 @@ async function brainCommand(t) {
         }
 
         localStorage.setItem("nico_or", key2);
-
         OR = key2;
 
         return "Yedek beyin bağlandı Reis 🧠";
     }
 
-
     /* HAVA */
 
     if (t.indexOf("hava ") === 0) {
-
         try {
+            var city = t.slice(5).trim();
 
-            var city =
-                t.slice(5).trim();
+            var g = await (
+                await fetch(
+                    "https://geocoding-api.open-meteo.com/v1/search?name=" +
+                    encodeURIComponent(city) +
+                    "&count=1&language=tr"
+                )
+            ).json();
 
-            var g =
-                await (
-                    await fetch(
-                        "https://geocoding-api.open-meteo.com/v1/search?name="
-                        + encodeURIComponent(city)
-                        + "&count=1&language=tr"
-                    )
-                ).json();
-
-
-            if (
-                g.results &&
-                g.results[0]
-            ) {
+            if (g.results && g.results[0]) {
 
                 var p = g.results[0];
 
+                var w = await (
+                    await fetch(
+                        "https://api.open-meteo.com/v1/forecast?latitude=" +
+                        p.latitude +
+                        "&longitude=" +
+                        p.longitude +
+                        "&current_weather=true"
+                    )
+                ).json();
 
-                var w =
-                    await (
-                        await fetch(
-                            "https://api.open-meteo.com/v1/forecast?latitude="
-                            + p.latitude
-                            + "&longitude="
-                            + p.longitude
-                            + "&current_weather=true"
-                        )
-                    ).json();
-
-
-                var cw =
-                    w.current_weather;
-
-
-                var k =
-                    cw.weathercode;
-
+                var cw = w.current_weather;
+                var k = cw.weathercode;
 
                 var d2 =
-                    k === 0
-                        ? "açık ☀️"
-                        : k < 3
-                        ? "az bulutlu 🌤️"
-                        : k < 45
-                        ? "kapalı ☁️"
-                        : k < 51
-                        ? "sisli 🌫️"
-                        : k < 71
-                        ? "yağmurlu 🌧️"
-                        : k < 95
-                        ? "karlı ❄️"
-                        : "gök gürültülü ⛈️";
-
+                    k === 0 ? "açık ☀️" :
+                    k < 3 ? "az bulutlu 🌤️" :
+                    k < 45 ? "kapalı ☁️" :
+                    k < 51 ? "sisli 🌫️" :
+                    k < 71 ? "yağmurlu 🌧️" :
+                    k < 95 ? "karlı ❄️" :
+                    "gök gürültülü ⛈️";
 
                 return (
-                    p.name
-                    + ": "
-                    + cw.temperature
-                    + "°C, "
-                    + d2
+                    p.name +
+                    ": " +
+                    cw.temperature +
+                    "°C, " +
+                    d2
                 );
             }
 
         } catch (e) {
-
-            console.error(
-                "Hava hatası:",
-                e
-            );
+            console.error("Hava hatası:", e);
         }
-
 
         return "Hava bilgisi alınamadı Reis 🌤️";
     }
 
-
-    /* WIKIPEDIA */
+    /* ARAMA */
 
     if (t.indexOf("ara ") === 0) {
-
         try {
 
-            var search =
-                t.slice(4).trim();
+            var search = t.slice(4).trim();
 
-
-            var s =
-                await (
-                    await fetch(
-                        "https://tr.wikipedia.org/w/api.php?action=query&list=search&srsearch="
-                        + encodeURIComponent(search)
-                        + "&format=json&origin=*"
-                    )
-                ).json();
-
+            var s = await (
+                await fetch(
+                    "https://tr.wikipedia.org/w/api.php?action=query&list=search&srsearch=" +
+                    encodeURIComponent(search) +
+                    "&format=json&origin=*"
+                )
+            ).json();
 
             var result =
                 s.query &&
@@ -150,63 +110,41 @@ async function brainCommand(t) {
                     ? s.query.search[0]
                     : null;
 
-
             if (result) {
-
                 return (
-                    "📚 "
-                    + result.title
-                    + ": "
-                    + result.snippet
-                        .replace(/<[^>]+>/g, "")
+                    "📚 " +
+                    result.title +
+                    ": " +
+                    result.snippet.replace(/<[^>]+>/g, "")
                 );
             }
 
         } catch (e) {
-
-            console.error(
-                "Arama hatası:",
-                e
-            );
+            console.error("Arama hatası:", e);
         }
-
 
         return "Bulamadım Reis 📚";
     }
 
-
-    if (
-        /^mod asistan/i.test(t)
-    ) {
-
+    if (/^mod asistan/i.test(t)) {
         return "Asistan modu aktif Reis 💼";
     }
 
-
-    if (
-        /^mod dost/i.test(t)
-    ) {
-
+    if (/^mod dost/i.test(t)) {
         return "Dost modu aktif Reis 😎";
     }
-
 
     return null;
 }
 
 
 /* =====================================================
-   NICO ANA BEYİN
+   ANA YAPAY ZEKA
 ===================================================== */
 
-async function askBrain(
-    msgs,
-    vision,
-    notes
-) {
+async function askBrain(msgs, vision, notes) {
 
     var mode = "dost";
-
 
     msgs.forEach(function (m) {
 
@@ -215,20 +153,11 @@ async function askBrain(
             typeof m.content === "string"
         ) {
 
-            if (
-                /mod asistan/i.test(
-                    m.content
-                )
-            ) {
-
+            if (/mod asistan/i.test(m.content)) {
                 mode = "asistan";
+            }
 
-            } else if (
-                /mod dost/i.test(
-                    m.content
-                )
-            ) {
-
+            if (/mod dost/i.test(m.content)) {
                 mode = "dost";
             }
         }
@@ -239,26 +168,29 @@ async function askBrain(
         (
             mode === "asistan"
                 ? "ASİSTAN modu: profesyonel, net ve düzenli cevap ver. "
-                : "DOST modu: samimi, doğal ve esprili ol; kullanıcıya Reis diye hitap et. "
-        )
-        +
-        "Sen NICO adında Türkçe konuşan yapay zeka asistanısın. "
-        +
-        "Kurucun Sidar Aydın'dır. "
-        +
-        "Sorulursa 'Ben Sidar Aydın'ın eseriyim' de. "
-        +
-        "Bilmediğin bilgiyi uydurma. "
-        +
-        "Kullanıcının sorusuna doğrudan cevap ver. "
-        +
-        "Tercihler: "
-        +
+                : "DOST modu: samimi, doğal ve esprili ol. Kullanıcıya Reis diye hitap et. "
+        ) +
+
+        "Sen NICO adında gelişmiş bir Türkçe yapay zeka asistanısın. " +
+
+        "Kurucun Sidar Aydın'dır. " +
+
+        "Sorulursa 'Ben Sidar Aydın'ın eseriyim' de. " +
+
+        "Bilmediğin bilgiyi uydurma. " +
+
+        "Kullanıcının sorusunu anla ve doğrudan cevapla. " +
+
+        "Gerektiğinde ayrıntılı açıklama yap. " +
+
+        "Türkçe konuş. " +
+
+        "Tercihler: " +
         (notes || "yok");
 
 
     var err =
-        "Bağlı yapay zeka beyni bulunamadı Reis.";
+        "Yapay zeka bağlantısı kurulamadı Reis.";
 
 
     /* =================================================
@@ -271,39 +203,27 @@ async function askBrain(
 
             var contents = [];
 
-
             for (
                 var i = 0;
                 i < msgs.length;
                 i++
             ) {
 
-                var m =
-                    msgs[i];
+                var m = msgs[i];
 
-
-                if (
-                    m.role === "system"
-                ) {
-
+                if (m.role === "system") {
                     continue;
                 }
 
-
                 var parts = [];
 
-
-                if (
-                    typeof m.content === "string"
-                ) {
+                if (typeof m.content === "string") {
 
                     parts.push({
                         text: m.content
                     });
 
-                } else if (
-                    Array.isArray(m.content)
-                ) {
+                } else if (Array.isArray(m.content)) {
 
                     for (
                         var j = 0;
@@ -311,71 +231,50 @@ async function askBrain(
                         j++
                     ) {
 
-                        var p =
-                            m.content[j];
+                        var p = m.content[j];
 
-
-                        if (
-                            p.type === "text"
-                        ) {
+                        if (p.type === "text") {
 
                             parts.push({
                                 text: p.text
                             });
 
-                        } else if (
-                            p.type === "image_url"
-                        ) {
+                        } else if (p.type === "image_url") {
 
-                            var url =
+                            var imageUrl =
                                 p.image_url &&
                                 p.image_url.url;
 
-
                             if (
-                                url &&
-                                url.indexOf(
-                                    "data:"
-                                ) === 0
+                                imageUrl &&
+                                imageUrl.indexOf("data:") === 0
                             ) {
 
                                 var comma =
-                                    url.indexOf(",");
-
+                                    imageUrl.indexOf(",");
 
                                 if (comma !== -1) {
 
                                     var header =
-                                        url.slice(
+                                        imageUrl.slice(
                                             5,
                                             comma
                                         );
 
-
                                     var base64 =
-                                        url.slice(
+                                        imageUrl.slice(
                                             comma + 1
                                         );
 
-
                                     var mime =
-                                        header.split(
-                                            ";"
-                                        )[0]
-                                        || "image/jpeg";
-
+                                        header.split(";")[0] ||
+                                        "image/jpeg";
 
                                     parts.push({
-
                                         inline_data: {
-
-                                            mime_type:
-                                                mime,
-
-                                            data:
-                                                base64
+                                            mime_type: mime,
+                                            data: base64
                                         }
-
                                     });
                                 }
                             }
@@ -383,16 +282,13 @@ async function askBrain(
                     }
                 }
 
-
                 if (parts.length) {
 
                     contents.push({
-
                         role:
                             m.role === "user"
                                 ? "user"
                                 : "model",
-
                         parts: parts
                     });
                 }
@@ -400,68 +296,60 @@ async function askBrain(
 
 
             if (!contents.length) {
-
                 throw new Error(
                     "Gönderilecek mesaj bulunamadı."
                 );
             }
 
 
-            var url =
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="
-                + encodeURIComponent(G);
+            /* GÜNCEL GEMINI REST ENDPOINT */
+
+            var geminiUrl =
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent";
 
 
-            var r =
-                await fetch(
-                    url,
-                    {
-                        method: "POST",
+            var r = await fetch(
+                geminiUrl,
+                {
+                    method: "POST",
 
-                        headers: {
-                            "Content-Type":
-                                "application/json"
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-goog-api-key": G
+                    },
+
+                    body: JSON.stringify({
+
+                        system_instruction: {
+                            parts: [
+                                {
+                                    text: sys
+                                }
+                            ]
                         },
 
-                        body: JSON.stringify({
+                        contents: contents,
 
-                            system_instruction: {
+                        generationConfig: {
+                            temperature: 0.7,
+                            maxOutputTokens: 2000
+                        }
 
-                                parts: [
-                                    {
-                                        text: sys
-                                    }
-                                ]
-
-                            },
-
-                            contents: contents,
-
-                            generationConfig: {
-
-                                temperature: 0.7,
-
-                                maxOutputTokens:
-                                    1500
-
-                            }
-
-                        })
-                    }
-                );
+                    })
+                }
+            );
 
 
-            var d =
-                await r.json();
+            var d = await r.json();
 
 
             if (!r.ok) {
 
                 err =
-                    "Gemini "
-                    + r.status
-                    + ": "
-                    + (
+                    "Gemini " +
+                    r.status +
+                    ": " +
+                    (
                         d.error &&
                         d.error.message
                             ? d.error.message
@@ -484,15 +372,13 @@ async function askBrain(
 
                     var text = "";
 
-                    answer.forEach(
-                        function (part) {
+                    answer.forEach(function (part) {
 
-                            if (part.text) {
-                                text += part.text;
-                            }
-
+                        if (part.text) {
+                            text += part.text;
                         }
-                    );
+
+                    });
 
 
                     if (text.trim()) {
@@ -503,7 +389,6 @@ async function askBrain(
                     }
                 }
 
-
                 err =
                     "Gemini cevap üretmedi.";
             }
@@ -511,17 +396,14 @@ async function askBrain(
         } catch (e) {
 
             err =
-                "Gemini bağlantı hatası: "
-                + (
-                    e.message || e
-                );
-
+                "Gemini bağlantı hatası: " +
+                (e.message || e);
         }
     }
 
 
     /* =================================================
-       OPENROUTER YEDEK BEYİN
+       OPENROUTER YEDEK
     ================================================= */
 
     if (OR) {
@@ -529,81 +411,68 @@ async function askBrain(
         try {
 
             var messages = [
-
                 {
                     role: "system",
                     content: sys
                 }
-
             ];
 
 
-            msgs
-                .slice(-12)
-                .forEach(
-                    function (m) {
+            msgs.slice(-12).forEach(function (m) {
 
-                        if (
-                            typeof m.content === "string"
-                        ) {
+                if (typeof m.content === "string") {
 
-                            messages.push({
+                    messages.push({
+                        role:
+                            m.role === "user"
+                                ? "user"
+                                : "assistant",
 
-                                role:
-                                    m.role === "user"
-                                        ? "user"
-                                        : "assistant",
+                        content:
+                            m.content
+                    });
+                }
 
-                                content:
-                                    m.content
-
-                            });
-                        }
-                    }
-                );
+            });
 
 
-            var orResponse =
-                await fetch(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    {
+            var orResponse = await fetch(
+                "https://openrouter.ai/api/v1/chat/completions",
+                {
 
-                        method: "POST",
+                    method: "POST",
 
-                        headers: {
+                    headers: {
 
-                            "Content-Type":
-                                "application/json",
+                        "Content-Type":
+                            "application/json",
 
-                            "Authorization":
-                                "Bearer " + OR,
+                        "Authorization":
+                            "Bearer " + OR,
 
-                            "HTTP-Referer":
-                                window.location.origin,
+                        "HTTP-Referer":
+                            window.location.origin,
 
-                            "X-Title":
-                                "NICO AI Assistant"
+                        "X-Title":
+                            "NICO AI Assistant"
+                    },
 
-                        },
+                    body: JSON.stringify({
 
-                        body: JSON.stringify({
+                        model:
+                            "meta-llama/llama-3.3-70b-instruct:free",
 
-                            model:
-                                "meta-llama/llama-3.3-70b-instruct:free",
+                        messages:
+                            messages,
 
-                            messages:
-                                messages,
+                        temperature:
+                            0.7,
 
-                            temperature:
-                                0.7,
-
-                            max_tokens:
-                                1500
-
-                        })
-
-                    }
-                );
+                        max_tokens:
+                            2000
+                    })
+                }
+            );
 
 
             var od =
@@ -613,10 +482,10 @@ async function askBrain(
             if (!orResponse.ok) {
 
                 err =
-                    "OpenRouter "
-                    + orResponse.status
-                    + ": "
-                    + (
+                    "OpenRouter " +
+                    orResponse.status +
+                    ": " +
+                    (
                         od.error &&
                         od.error.message
                             ? od.error.message
@@ -635,8 +504,7 @@ async function askBrain(
                 if (ot) {
 
                     return {
-                        text:
-                            ot.trim()
+                        text: ot.trim()
                     };
                 }
             }
@@ -644,10 +512,8 @@ async function askBrain(
         } catch (e) {
 
             err =
-                "OpenRouter hatası: "
-                + (
-                    e.message || e
-                );
+                "OpenRouter hatası: " +
+                (e.message || e);
         }
     }
 
@@ -661,9 +527,7 @@ async function askBrain(
         var lastM =
             msgs[msgs.length - 1];
 
-
         var lp = "";
-
 
         if (lastM) {
 
@@ -671,24 +535,16 @@ async function askBrain(
                 typeof lastM.content === "string"
             ) {
 
-                lp =
-                    lastM.content;
+                lp = lastM.content;
 
             } else if (
-                Array.isArray(
-                    lastM.content
-                )
+                Array.isArray(lastM.content)
             ) {
 
                 var textPart =
-                    lastM.content.find(
-                        function (x) {
-                            return (
-                                x.type === "text"
-                            );
-                        }
-                    );
-
+                    lastM.content.find(function (x) {
+                        return x.type === "text";
+                    });
 
                 lp =
                     textPart
@@ -701,18 +557,16 @@ async function askBrain(
         if (lp) {
 
             var fallbackUrl =
-                "https://text.pollinations.ai/"
-                + encodeURIComponent(
-                    sys
-                    + "\n\nKullanıcının sorusu:\n"
-                    + lp
+                "https://text.pollinations.ai/" +
+                encodeURIComponent(
+                    sys +
+                    "\n\nKullanıcının sorusu:\n" +
+                    lp
                 );
 
 
             var fallback =
-                await fetch(
-                    fallbackUrl
-                );
+                await fetch(fallbackUrl);
 
 
             if (fallback.ok) {
@@ -727,8 +581,7 @@ async function askBrain(
                 ) {
 
                     return {
-                        text:
-                            ft.trim()
+                        text: ft.trim()
                     };
                 }
             }
@@ -737,32 +590,25 @@ async function askBrain(
     } catch (e) {
 
         console.log(
-            "Yedek beyin çalışmadı:",
+            "Son yedek çalışmadı:",
             e
         );
     }
 
 
     return {
-
         text: null,
-
         err: err
-
     };
 }
 
 
 /* =====================================================
-   EN ÖNEMLİ KISIM
-   nico.js'nin askBrain'e erişmesini garanti eder.
+   GLOBAL ERİŞİM
 ===================================================== */
 
-window.brainCommand =
-    brainCommand;
-
-window.askBrain =
-    askBrain;
+window.brainCommand = brainCommand;
+window.askBrain = askBrain;
 
 console.log(
     "NICO brain.js başarıyla yüklendi 🧠"
