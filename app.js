@@ -7,108 +7,199 @@ import { StorageManager } from './storage.js';
 
 const FOUNDER = 'Sidar Aydın';
 
-/* -----------------------------
+/* =========================================================
+   WORKER
+========================================================= */
+
+const WORKER_URL =
+    'https://bitter-haze-2503.usermame5252.workers.dev';
+
+/* =========================================================
    AYARLAR
------------------------------ */
+========================================================= */
 
-let orKey = localStorage.getItem('nico_orkey') || '';
-let apiKey = localStorage.getItem('nico_key') || '';
-
-let pass = localStorage.getItem('nico_pass') || 'Şule45580';
+let pass =
+    localStorage.getItem('nico_pass') ||
+    'Şule45580';
 
 let founder =
     localStorage.getItem('nico_founder') === '1';
 
 let lastError = '';
 
+/* =========================================================
+   HTML
+========================================================= */
+
+const chat =
+    document.getElementById('chat-messages');
+
+const inp =
+    document.getElementById('user-input');
+
+const sendBtn =
+    document.getElementById('send-btn');
+
+const clearBtn =
+    document.getElementById('clear-chat');
+
+const uploadBtn =
+    document.getElementById('upload-btn');
+
+/* =========================================================
+   GÖRSEL SİSTEMİ
+========================================================= */
+
+let pendingImage = null;
+
 /*
-   OpenRouter modelleri.
-   İlk model çalışmazsa ikinci denenir.
+   HTML'de file input yoksa kendimiz oluşturuyoruz.
 */
-const OR_MODELS = [
-    'meta-llama/llama-3.3-70b-instruct:free',
-    'google/gemma-3-27b-it:free'
-];
 
-/* -----------------------------
-   HTML ELEMANLARI
------------------------------ */
+const imageInput =
+    document.createElement('input');
 
-const chat = document.getElementById('chat-messages');
-const inp = document.getElementById('user-input');
-const sendBtn = document.getElementById('send-btn');
-const clearBtn = document.getElementById('clear-chat');
-const uploadBtn = document.getElementById('upload-btn');
+imageInput.type = 'file';
+imageInput.accept = 'image/*';
+imageInput.style.display = 'none';
 
-/* -----------------------------
-   SOHBET GEÇMİŞİ
------------------------------ */
+document.body.appendChild(imageInput);
+
+/* =========================================================
+   GEÇMİŞ
+========================================================= */
 
 let hist = [];
 
 try {
-    hist = StorageManager.getHistory() || [];
+
+    hist =
+        StorageManager.getHistory() || [];
+
 } catch (e) {
-    console.error('Geçmiş yüklenemedi:', e);
+
+    console.error(
+        'Geçmiş yüklenemedi:',
+        e
+    );
+
     hist = [];
 }
 
 /* =========================================================
-   MESAJ EKLEME
+   MESAJ EKLE
 ========================================================= */
 
-function add(text, role = 'ai') {
+function add(
+    text,
+    role = 'ai'
+) {
 
     if (!chat) return;
 
-    const d = document.createElement('div');
+    const d =
+        document.createElement('div');
 
-    d.className = 'message ' + role;
+    d.className =
+        'message ' + role;
 
-    d.textContent = String(text);
+    d.textContent =
+        String(text);
 
     chat.appendChild(d);
 
-    chat.scrollTop = chat.scrollHeight;
+    chat.scrollTop =
+        chat.scrollHeight;
 }
 
+/* =========================================================
+   GÖRSEL MESAJ
+========================================================= */
+
+function addImageMessage(
+    image,
+    text = '',
+    role = 'user'
+) {
+
+    if (!chat) return;
+
+    const box =
+        document.createElement('div');
+
+    box.className =
+        'message ' + role;
+
+    const img =
+        document.createElement('img');
+
+    img.src = image;
+
+    img.style.maxWidth = '100%';
+    img.style.borderRadius = '15px';
+    img.style.display = 'block';
+    img.style.marginBottom = '8px';
+
+    box.appendChild(img);
+
+    if (text) {
+
+        const p =
+            document.createElement('div');
+
+        p.textContent = text;
+
+        box.appendChild(p);
+    }
+
+    chat.appendChild(box);
+
+    chat.scrollTop =
+        chat.scrollHeight;
+}
 
 /* =========================================================
-   YAZIYOR ANİMASYONU
+   TYPING
 ========================================================= */
 
 function addTyping() {
 
     if (!chat) return null;
 
-    const d = document.createElement('div');
+    const d =
+        document.createElement('div');
 
-    d.className = 'message ai';
+    d.className =
+        'message ai';
 
-    d.id = 'nico-typing';
+    d.id =
+        'nico-typing';
 
-    d.textContent = 'NICO düşünüyor... 🧠';
+    d.textContent =
+        'NICO fotoğrafı inceliyor... 👁️🧠';
 
     chat.appendChild(d);
 
-    chat.scrollTop = chat.scrollHeight;
+    chat.scrollTop =
+        chat.scrollHeight;
 
     return d;
 }
 
-
 function removeTyping() {
 
-    const el = document.getElementById('nico-typing');
+    const el =
+        document.getElementById(
+            'nico-typing'
+        );
 
     if (el) {
         el.remove();
     }
 }
 
-
 /* =========================================================
-   NICO SİSTEM TALİMATI
+   SİSTEM
 ========================================================= */
 
 function sys() {
@@ -116,68 +207,98 @@ function sys() {
     return `
 Sen NICO adında gelişmiş bir yapay zeka asistanısın.
 
-Kurucun:
-${FOUNDER}
+Kurucun Sidar Aydın'dır.
 
-Kullanıcıya:
-"Reis" diye hitap edebilirsin.
+Türkçe konuş.
 
-Kim olduğunu sorarlarsa:
-"Ben Sidar Aydın'ın eseriyim." de.
+Kullanıcıya gerektiğinde Reis diye hitap edebilirsin.
 
-Görevin:
-- Türkçe konuşmak.
-- Soruları mümkün olduğunca doğru cevaplamak.
-- Bilmediğin bilgiyi uydurmamak.
-- Emin olmadığın konularda bunu açıkça belirtmek.
-- Samimi ama anlaşılır olmak.
-- Gereksiz uzun cevaplar vermemek.
-- Kod sorularında çalışan ve eksiksiz kod vermek.
-- Kullanıcının önceki mesajlarındaki bağlamı dikkate almak.
-- Kullanıcı bir şey sorduğunda doğrudan cevap vermek.
-- Hata olduğunda hatanın gerçek sebebini açıklamak.
-- Kendini insan gibi göstermemek.
-- Kendi yeteneklerini olduğundan fazla göstermemek.
+Sen samimi, doğal, zeki ve yardımcı bir asistansın.
 
-Önemli:
-Senin adın NICO.
+ÖNEMLİ GÖRSEL KURALLARI:
+
+Kullanıcı sana bir fotoğraf gönderirse
+ve ayrıca soru yazmamışsa SORU BEKLEME.
+
+Fotoğrafı kendin incele.
+
+Fotoğrafta gördüğün önemli nesneleri,
+kişileri, ortamı, yazıları, renkleri,
+ekranları ve dikkat çeken ayrıntıları
+doğal şekilde açıkla.
+
+Örneğin:
+"Reis, fotoğrafta bir telefon ekranı görüyorum..."
+gibi doğrudan analiz yap.
+
+Kullanıcı fotoğraf + yazı gönderirse,
+fotoğrafı ve yazıyı birlikte değerlendir.
+
+Kullanıcı fotoğrafın belirli bir bölümünü
+işaret ettiğini söylerse özellikle o bölgeye odaklan.
+
+Görmediğin bir şeyi kesinmiş gibi söyleme.
+
+Bir görüntüde yazı varsa okuyabildiğin kadarını aktar.
+
+Normal sorularda doğrudan cevap ver.
+
+Kod sorularında çalışan ve eksiksiz kod ver.
+
+Bilmediğin şeyi uydurma.
+
+Sen NICO'sun.
 `;
 }
 
-
 /* =========================================================
-   YEREL / API YOKKEN ÇALIŞAN BEYİN
+   YEREL CEVAP
 ========================================================= */
 
 function localBrain(text) {
 
-    const q = text.toLowerCase().trim();
+    const q =
+        String(text || '')
+            .toLowerCase()
+            .trim();
 
-    if (/^(selam|merhaba|sa|selamlar)/i.test(q)) {
-        return 'Selam Reis! 👋 NICO burada. Nasıl yardımcı olayım?';
+    if (
+        /^(selam|merhaba|sa|selamlar)/i
+            .test(q)
+    ) {
+
+        return (
+            'Selam Reis! 👋 ' +
+            'NICO burada. Nasıl yardımcı olayım?'
+        );
     }
 
     if (
         q.includes('kimsin') ||
-        q.includes('adın ne') ||
-        q.includes('sen nesin')
+        q.includes('adın ne')
     ) {
-        return 'Ben NICO, Sidar Aydın tarafından geliştirilen yapay zeka asistanıyım. 🤖';
+
+        return (
+            'Ben NICO, Sidar Aydın tarafından ' +
+            'geliştirilen yapay zeka asistanıyım. 🤖'
+        );
     }
 
     if (
         q.includes('kim yaptı') ||
-        q.includes('kurucun kim') ||
-        q.includes('seni kim yaptı') ||
-        q.includes('sahibin kim')
+        q.includes('kurucun kim')
     ) {
-        return `Ben ${FOUNDER}'ın eseriyim Reis. 🫡`;
+
+        return (
+            `Ben ${FOUNDER}'ın eseriyim Reis. 🫡`
+        );
     }
 
     if (
         q.includes('çalışıyor musun') ||
         q.includes('aktif misin')
     ) {
+
         return 'Aktifim Reis. 🟢';
     }
 
@@ -185,362 +306,313 @@ function localBrain(text) {
         q.includes('teşekkür') ||
         q.includes('sağ ol')
     ) {
+
         return 'Rica ederim Reis. 😎';
     }
 
     return null;
 }
 
-
 /* =========================================================
-   OPENROUTER BEYNİ
+   WORKER'A GÖNDER
 ========================================================= */
 
-async function askOR(messages) {
-
-    if (!orKey) {
-        return null;
-    }
-
-    lastError = '';
-
-    const formattedMessages = [
-        {
-            role: 'system',
-            content: sys()
-        }
-    ];
-
-    for (const item of messages.slice(-12)) {
-
-        if (!item || !item.parts || !item.parts[0]) {
-            continue;
-        }
-
-        const text = item.parts[0].text;
-
-        if (!text) continue;
-
-        formattedMessages.push({
-            role:
-                item.role === 'user'
-                    ? 'user'
-                    : 'assistant',
-            content: text
-        });
-    }
-
-
-    for (const model of OR_MODELS) {
-
-        try {
-
-            const response = await fetch(
-                'https://openrouter.ai/api/v1/chat/completions',
-                {
-                    method: 'POST',
-
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + orKey,
-
-                        /*
-                           OpenRouter için ek bilgiler.
-                        */
-                        'HTTP-Referer':
-                            window.location.origin,
-
-                        'X-Title':
-                            'NICO AI Assistant'
-                    },
-
-                    body: JSON.stringify({
-
-                        model: model,
-
-                        messages: formattedMessages,
-
-                        temperature: 0.7,
-
-                        max_tokens: 1500
-
-                    })
-                }
-            );
-
-
-            const data = await response.json();
-
-
-            if (!response.ok) {
-
-                lastError =
-                    'OpenRouter ' +
-                    response.status +
-                    ': ' +
-                    (
-                        data?.error?.message ||
-                        'Bilinmeyen hata'
-                    );
-
-                continue;
-            }
-
-
-            const answer =
-                data?.choices?.[0]?.message?.content;
-
-
-            if (
-                answer &&
-                typeof answer === 'string'
-            ) {
-
-                return answer.trim();
-            }
-
-
-            lastError =
-                'OpenRouter cevap üretmedi.';
-
-        } catch (error) {
-
-            lastError =
-                'OpenRouter bağlantı hatası: ' +
-                (
-                    error?.message ||
-                    error
-                );
-        }
-    }
-
-    return null;
-}
-
-
-/* =========================================================
-   GEMINI BEYNİ
-========================================================= */
-
-async function askG(messages) {
-
-    if (!apiKey) {
-        return null;
-    }
+async function askWorker(messages) {
 
     lastError = '';
 
     try {
 
-        const contents = messages
-            .slice(-12)
-            .map(item => ({
+        const response =
+            await fetch(
+                WORKER_URL + '/api/chat',
+                {
+                    method: 'POST',
 
-                role:
-                    item.role === 'user'
-                        ? 'user'
-                        : 'model',
-
-                parts: [
-                    {
-                        text:
-                            item.parts?.[0]?.text || ''
-                    }
-                ]
-
-            }))
-            .filter(item =>
-                item.parts[0].text
-            );
-
-
-        const response = await fetch(
-
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key='
-            + encodeURIComponent(apiKey),
-
-            {
-                method: 'POST',
-
-                headers: {
-                    'Content-Type':
-                        'application/json'
-                },
-
-                body: JSON.stringify({
-
-                    system_instruction: {
-
-                        parts: [
-                            {
-                                text: sys()
-                            }
-                        ]
-
+                    headers: {
+                        'Content-Type':
+                            'application/json'
                     },
 
-                    contents: contents,
+                    body: JSON.stringify({
 
-                    generationConfig: {
+                        messages:
+                            messages,
 
-                        temperature: 0.7,
+                        system:
+                            sys()
 
-                        maxOutputTokens: 1500
+                    })
+                }
+            );
 
-                    }
+        const data =
+            await response.json();
 
-                })
-            }
-        );
-
-
-        const data = await response.json();
-
-
-        if (!response.ok) {
+        if (!response.ok || !data.ok) {
 
             lastError =
-                'Gemini ' +
-                response.status +
-                ': ' +
-                (
-                    data?.error?.message ||
-                    'Bilinmeyen hata'
-                );
+                data?.error ||
+                `Worker ${response.status}`;
 
             return null;
         }
 
+        if (
+            data.text &&
+            typeof data.text === 'string'
+        ) {
 
-        const answer =
-            data?.candidates?.[0]?.content?.parts
-                ?.map(part => part.text || '')
-                .join('')
-                .trim();
-
-
-        if (answer) {
-            return answer;
+            return data.text.trim();
         }
 
-
         lastError =
-            'Gemini cevap üretmedi.';
+            'Worker boş cevap verdi.';
 
         return null;
 
     } catch (error) {
 
         lastError =
-            'Gemini bağlantı hatası: ' +
+            'Worker bağlantı hatası: ' +
             (
                 error?.message ||
-                error
+                String(error)
             );
 
         return null;
     }
 }
 
-
 /* =========================================================
-   ANA NICO BEYNİ
+   ANA BEYİN
 ========================================================= */
-
-/*
-   BU FONKSİYON ÖNEMLİ.
-   Ekrandaki:
-   "askBrain is not defined"
-   HATASINI ÇÖZEN KISIM BURASI.
-*/
 
 async function askBrain(messages) {
 
     /*
-       1. OpenRouter varsa önce dene.
+       Önce Cloudflare Worker.
+       API anahtarı tarayıcıya açılmaz.
     */
 
-    if (orKey) {
+    const answer =
+        await askWorker(messages);
 
-        const answer =
-            await askOR(messages);
-
-        if (answer) {
-            return answer;
-        }
+    if (answer) {
+        return answer;
     }
 
-
     /*
-       2. OpenRouter çalışmazsa Gemini.
+       Worker çalışmazsa yerel cevap.
     */
 
-    if (apiKey) {
-
-        const answer =
-            await askG(messages);
-
-        if (answer) {
-            return answer;
-        }
-    }
-
-
-    /*
-       3. Hiç API yoksa yerel cevap.
-       Son kullanıcı mesajını bul.
-    */
-
-    const lastUserMessage =
+    const lastUser =
         [...messages]
             .reverse()
-            .find(x => x.role === 'user');
+            .find(
+                x =>
+                    x &&
+                    x.role === 'user'
+            );
 
+    if (lastUser) {
 
-    if (lastUserMessage) {
+        const parts =
+            Array.isArray(lastUser.parts)
+                ? lastUser.parts
+                : [];
 
-        const text =
-            lastUserMessage.parts?.[0]?.text || '';
+        const textPart =
+            parts.find(
+                x =>
+                    x &&
+                    typeof x.text === 'string'
+            );
 
         const local =
-            localBrain(text);
+            localBrain(
+                textPart?.text || ''
+            );
 
         if (local) {
             return local;
         }
     }
 
-
-    /*
-       4. Hiçbir beyin cevap veremediyse.
-    */
-
     if (lastError) {
 
-        return '⚠️ NICO beyin bağlantısında sorun oluştu:\n\n'
-            + lastError;
+        return (
+            '⚠️ NICO Worker hatası:\n\n' +
+            lastError
+        );
     }
 
-
-    return '🧠 Reis, şu anda bağlı bir yapay zeka modeli yok. OR-KEY veya NICO-KEY eklemelisin.';
+    return (
+        '🧠 Reis, NICO şu anda cevap veremiyor.'
+    );
 }
 
-
-/* =========================================================
-   GLOBAL ASK BRAIN
-========================================================= */
-
 /*
-   HTML içinde veya başka JS dosyasında:
-   askBrain(...)
-   çağrılırsa artık hata vermesin.
+   Diğer JS dosyaları erişebilsin.
 */
 
-window.askBrain = askBrain;
-
+window.askBrain =
+    askBrain;
 
 /* =========================================================
-   MESAJ GÖNDERME
+   DATA URL -> GEMINI PART
+========================================================= */
+
+function imageToPart(dataUrl) {
+
+    if (
+        !dataUrl ||
+        typeof dataUrl !== 'string'
+    ) {
+        return null;
+    }
+
+    const match =
+        dataUrl.match(
+            /^data:(image\/[^;]+);base64,(.+)$/
+        );
+
+    if (!match) {
+        return null;
+    }
+
+    return {
+
+        inline_data: {
+
+            mime_type:
+                match[1],
+
+            data:
+                match[2]
+
+        }
+
+    };
+}
+
+/* =========================================================
+   DOSYA OKUMA
+========================================================= */
+
+function readImage(file) {
+
+    return new Promise(
+        (resolve, reject) => {
+
+            const reader =
+                new FileReader();
+
+            reader.onload =
+                () => resolve(
+                    reader.result
+                );
+
+            reader.onerror =
+                reject;
+
+            reader.readAsDataURL(file);
+        }
+    );
+}
+
+/* =========================================================
+   FOTOĞRAF SEÇ
+========================================================= */
+
+if (uploadBtn) {
+
+    uploadBtn.addEventListener(
+        'click',
+        () => {
+
+            imageInput.click();
+
+        }
+    );
+}
+
+/* =========================================================
+   FOTOĞRAF GELDİ
+========================================================= */
+
+imageInput.addEventListener(
+    'change',
+    async () => {
+
+        const file =
+            imageInput.files?.[0];
+
+        if (!file) {
+            return;
+        }
+
+        /*
+           Boyut kontrolü
+        */
+
+        if (
+            file.size >
+            12 * 1024 * 1024
+        ) {
+
+            add(
+                '⚠️ Fotoğraf çok büyük Reis. 12 MB altında bir görsel seç.',
+                'ai'
+            );
+
+            imageInput.value = '';
+
+            return;
+        }
+
+        try {
+
+            pendingImage =
+                await readImage(file);
+
+            /*
+               Fotoğrafı hemen göster.
+            */
+
+            addImageMessage(
+                pendingImage,
+                ''
+            );
+
+            /*
+               Kullanıcıya yazı yazma
+               fırsatı veriyoruz.
+            */
+
+            if (inp) {
+
+                inp.placeholder =
+                    'Fotoğraf hazır. İstersen ne istediğini yaz...';
+
+                inp.focus();
+            }
+
+        } catch (error) {
+
+            add(
+                '⚠️ Fotoğraf okunamadı Reis.',
+                'ai'
+            );
+
+        }
+
+        imageInput.value = '';
+    }
+);
+
+/* =========================================================
+   GÖNDER
 ========================================================= */
 
 async function send() {
@@ -550,17 +622,36 @@ async function send() {
     const text =
         inp.value.trim();
 
-    if (!text) return;
+    /*
+       Hem yazı hem fotoğraf yoksa gönderme.
+    */
 
+    if (
+        !text &&
+        !pendingImage
+    ) {
+        return;
+    }
 
     inp.value = '';
 
+    /*
+       FOTOĞRAF VARSA
+    */
 
-    /* -------------------------
-       KURUCU ŞİFRESİ
-    ------------------------- */
+    const currentImage =
+        pendingImage;
 
-    if (text === pass) {
+    pendingImage = null;
+
+    /*
+       Kurucu şifresi
+    */
+
+    if (
+        !currentImage &&
+        text === pass
+    ) {
 
         founder = true;
 
@@ -569,32 +660,41 @@ async function send() {
             '1'
         );
 
-        add('••••••', 'user');
+        add(
+            '••••••',
+            'user'
+        );
 
-        setTimeout(() => {
+        setTimeout(
+            () => {
 
-            add(
-                'Hoş geldin Sidar Reis! 🎉 Seni tanıdım. Kurucu modu aktif.',
-                'ai'
-            );
+                add(
+                    'Hoş geldin Sidar Reis! 🎉 Kurucu modu aktif.',
+                    'ai'
+                );
 
-        }, 400);
+            },
+            300
+        );
 
         return;
     }
 
-
-    /* -------------------------
-       YENİ ŞİFRE
-    ------------------------- */
+    /*
+       Yeni şifre
+    */
 
     if (
+        !currentImage &&
         founder &&
         text.startsWith('yeni şifre ')
     ) {
 
         const newPass =
-            text.slice('yeni şifre '.length)
+            text
+                .slice(
+                    'yeni şifre '.length
+                )
                 .trim();
 
         if (!newPass) {
@@ -607,8 +707,8 @@ async function send() {
             return;
         }
 
-
-        pass = newPass;
+        pass =
+            newPass;
 
         localStorage.setItem(
             'nico_pass',
@@ -623,154 +723,211 @@ async function send() {
         return;
     }
 
-
-    /* -------------------------
-       OPENROUTER KEY
-    ------------------------- */
-
-    if (
-        text.startsWith('OR-KEY:')
-    ) {
-
-        const key =
-            text.slice(7).trim();
-
-        if (!key) {
-
-            add(
-                'OpenRouter anahtarı boş görünüyor.',
-                'ai'
-            );
-
-            return;
-        }
-
-
-        orKey = key;
-
-        localStorage.setItem(
-            'nico_orkey',
-            orKey
-        );
-
-        add(
-            'OpenRouter beyni bağlandı Reis! 🧠',
-            'ai'
-        );
-
-        return;
-    }
-
-
-    /* -------------------------
-       GEMINI KEY
-    ------------------------- */
+    /*
+       Kullanıcı mesajını ekrana koy.
+       Fotoğraf zaten önizleme olarak gösterilmişti.
+    */
 
     if (
-        text.startsWith('NICO-KEY:')
+        !currentImage &&
+        text
     ) {
 
-        const key =
-            text.slice(9).trim();
+        add(
+            text,
+            'user'
+        );
 
-        if (!key) {
+    } else if (
+        currentImage &&
+        text
+    ) {
 
-            add(
-                'Gemini anahtarı boş görünüyor.',
-                'ai'
+        /*
+           Fotoğrafın altına yazıyı ekle.
+        */
+
+        const boxes =
+            chat?.querySelectorAll(
+                '.message.user'
             );
 
-            return;
+        const last =
+            boxes?.[boxes.length - 1];
+
+        if (last) {
+
+            const p =
+                document.createElement(
+                    'div'
+                );
+
+            p.textContent =
+                text;
+
+            last.appendChild(p);
         }
-
-
-        apiKey = key;
-
-        localStorage.setItem(
-            'nico_key',
-            apiKey
-        );
-
-        add(
-            'Gemini beyni kaydedildi Reis! 🧠',
-            'ai'
-        );
-
-        return;
     }
 
+    /*
+       Worker mesaj formatı
+    */
 
-    /* -------------------------
-       KULLANICI MESAJI
-    ------------------------- */
+    const parts = [];
 
-    add(text, 'user');
+    /*
+       FOTOĞRAF
+    */
 
+    if (currentImage) {
 
-    hist.push({
+        const imagePart =
+            imageToPart(
+                currentImage
+            );
+
+        if (imagePart) {
+
+            parts.push(
+                imagePart
+            );
+        }
+    }
+
+    /*
+       YAZI
+    */
+
+    if (text) {
+
+        parts.push({
+
+            text: text
+
+        });
+
+    }
+
+    /*
+       Fotoğraf var ama yazı yoksa
+       otomatik analiz komutu.
+    */
+
+    if (
+        currentImage &&
+        !text
+    ) {
+
+        parts.unshift({
+
+            text:
+                `
+Bu fotoğrafı kendin analiz et Reis.
+Bana soru sormadan fotoğrafta ne gördüğünü,
+önemli ayrıntıları, varsa yazıları,
+nesneleri ve dikkat çeken noktaları açıkla.
+`
+        });
+    }
+
+    /*
+       Geçmiş mesajları hazırla.
+    */
+
+    const previous =
+        hist
+            .slice(-10)
+            .map(item => {
+
+                return {
+
+                    role:
+                        item.role === 'user'
+                            ? 'user'
+                            : 'model',
+
+                    parts: [
+                        {
+                            text:
+                                item.text || ''
+                        }
+                    ]
+
+                };
+
+            })
+            .filter(
+                item =>
+                    item.parts[0].text
+            );
+
+    /*
+       Yeni mesaj.
+    */
+
+    previous.push({
 
         role: 'user',
 
-        text: text
+        parts: parts
 
     });
 
-
     /*
-       API formatına çevir.
+       Geçmişe sadece yazıyı kaydet.
+       Base64 fotoğrafı localStorage'a
+       koymuyoruz; yoksa hafıza şişer.
     */
 
-    const messages =
-        hist
-            .slice(-12)
-            .map(item => ({
+    if (text) {
 
-                role:
-                    item.role === 'user'
-                        ? 'user'
-                        : 'model',
+        hist.push({
 
-                parts: [
-                    {
-                        text:
-                            item.text || ''
-                    }
-                ]
+            role: 'user',
 
-            }))
-            .filter(item =>
-                item.parts[0].text
-            );
+            text: text
 
+        });
 
-    /* -------------------------
-       YAZIYOR...
-    ------------------------- */
+    } else if (currentImage) {
+
+        hist.push({
+
+            role: 'user',
+
+            text:
+                '📷 Fotoğraf gönderildi.'
+
+        });
+
+    }
+
+    /*
+       NICO düşünüyor
+    */
 
     addTyping();
 
-
     try {
 
-        /*
-           NICO'NUN GERÇEK BEYNİ
-        */
-
         const reply =
-            await askBrain(messages);
-
+            await askBrain(
+                previous
+            );
 
         removeTyping();
 
+        /*
+           Cevabı göster
+        */
 
         add(
             reply,
             'ai'
         );
 
-
         /*
-           Geçmişe kaydet.
+           Geçmiş
         */
 
         hist.push({
@@ -781,43 +938,54 @@ async function send() {
 
         });
 
-
         /*
-           LocalStorage'a kaydet.
+           Kaydet
         */
 
         try {
 
-            StorageManager.saveHistory(hist);
+            StorageManager.saveHistory(
+                hist
+            );
 
-        } catch (storageError) {
+        } catch (e) {
 
             console.error(
                 'Geçmiş kaydedilemedi:',
-                storageError
+                e
             );
         }
-
 
     } catch (error) {
 
         removeTyping();
 
-
         console.error(
-            'NICO ana hata:',
+            'NICO hata:',
             error
         );
 
-
         add(
-            '⚠️ NICO beklenmeyen bir hatayla karşılaştı:\n' +
-            (error?.message || error),
+            '⚠️ NICO beklenmeyen hata:\n' +
+            (
+                error?.message ||
+                String(error)
+            ),
             'ai'
         );
     }
-}
 
+    /*
+       Placeholder geri dönsün
+    */
+
+    if (inp) {
+
+        inp.placeholder =
+            "NICO'ya yaz...";
+
+    }
+}
 
 /* =========================================================
    EVENTLER
@@ -830,7 +998,6 @@ if (sendBtn) {
         send
     );
 }
-
 
 if (inp) {
 
@@ -846,14 +1013,15 @@ if (inp) {
                 event.preventDefault();
 
                 send();
+
             }
+
         }
     );
 }
 
-
 /* =========================================================
-   SOHBET TEMİZLE
+   TEMİZLE
 ========================================================= */
 
 if (clearBtn) {
@@ -872,9 +1040,7 @@ if (clearBtn) {
 
             }
 
-
             hist = [];
-
 
             if (chat) {
 
@@ -885,52 +1051,33 @@ if (clearBtn) {
                     'ai'
                 );
             }
-        }
-    );
-}
-
-
-/* =========================================================
-   FOTOĞRAF
-========================================================= */
-
-if (uploadBtn) {
-
-    uploadBtn.addEventListener(
-        'click',
-        () => {
-
-            add(
-                '📷 Görsel sistemi henüz bağlanmadı Reis. Önce NICO\'nun metin beynini sağlamlaştırıyoruz.',
-                'ai'
-            );
 
         }
     );
 }
 
-
 /* =========================================================
-   GEÇMİŞİ EKRANA YÜKLE
+   GEÇMİŞİ YÜKLE
 ========================================================= */
 
 if (chat) {
 
     chat.innerHTML = '';
 
-    hist.forEach(item => {
+    hist.forEach(
+        item => {
 
-        add(
-            item.text,
-            item.role === 'user'
-                ? 'user'
-                : 'ai'
-        );
+            add(
+                item.text,
+                item.role === 'user'
+                    ? 'user'
+                    : 'ai'
+            );
 
-    });
+        }
+    );
 
 }
-
 
 /* =========================================================
    BAŞLANGIÇ
@@ -941,11 +1088,11 @@ console.log(
 );
 
 console.log(
-    'OpenRouter:',
-    orKey ? 'BAĞLI' : 'YOK'
+    'Worker:',
+    WORKER_URL
 );
 
 console.log(
-    'Gemini:',
-    apiKey ? 'BAĞLI' : 'YOK'
+    'Founder:',
+    founder
 );
