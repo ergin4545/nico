@@ -3,17 +3,27 @@ const WORKER_URL = "https://bitter-haze-2503.usermame5252.workers.dev";
 function buildSystem(mode, notes) {
   const tone = mode === "asistan"
     ? "Profesyonel, düzenli ve sonuç odaklı konuş. Yanıtlarını başlıklar ve kısa adımlarla yapılandır."
-    : "Samimi, doğal ve yardımcı konuş. Gerektiğinde kullanıcıya Reis diye hitap edebilirsin.";
+    : "Samimi, sıcak ve doğal konuş. Karşılıklı sohbet kur; kullanıcının duygu ve niyetine dikkat et. Gerektiğinde kullanıcıya Reis diye hitap edebilirsin, fakat bunu her yanıtta tekrarlama.";
 
   return [
-    "Sen NICO adında Türkçe konuşan bir yapay zekâ asistanısın.",
+    "Sen NICO adında Türkçe konuşan, doğal diyalog kurabilen bir yapay zekâ asistanısın.",
+    "NICO’nun kurucusu Sidar Aydın’dır. Kullanıcı NICO’yu kimin kurduğunu sorarsa bu bilgiyi kısa, net ve doğal biçimde söyle.",
     tone,
+    "Kullanıcı sadece muhabbet etmek isterse görev listesi vermek yerine karşılık ver, uygun bir takip sorusu sor ve sohbeti akıcı tut.",
+    "Kullanıcı selam verir, nasıl olduğunu sorar veya gündelik bir konu açarsa insani, kısa ve sıcak bir yanıt ver.",
+    "Kalıcı hafıza notlarını yalnızca kullanıcı açıkça kaydettiğinde kullan; notlarda yer alan bilgileri faydalı olduğu durumlarda doğal biçimde hatırla.",
     "Kısa fakat yararlı yanıtlar ver; kullanıcı ayrıntı isterse derinleş.",
     "Kod istenirse eksiksiz ve çalıştırılabilir örnekler sun.",
     "Görsel gönderilmişse yalnızca gerçekten seçebildiğin ayrıntıları açıkla; görmediğin bilgileri uydurma.",
     "Yanıtlarında gerektiğinde Markdown kullanabilirsin.",
     notes ? `Kullanıcının kaydettiği notlar: ${notes}` : "Kullanıcının kaydedilmiş notu yok."
   ].join(" ");
+}
+
+function founderAnswer(text) {
+  const lower = String(text || "").toLocaleLowerCase("tr-TR");
+  const asksFounder = /(?:seni|nico'?yu)\s+kim\s+kurdu|kurucun\s+kim|kurucusu\s+kim/.test(lower);
+  return asksFounder ? "NICO’nun kurucusu Sidar Aydın’dır." : null;
 }
 
 function weatherDescription(code) {
@@ -31,6 +41,9 @@ function weatherDescription(code) {
 async function brainCommand(text) {
   const query = String(text || "").trim();
   const lower = query.toLocaleLowerCase("tr-TR");
+
+  const founder = founderAnswer(query);
+  if (founder) return founder;
 
   if (lower.startsWith("hava ")) {
     const place = query.slice(5).trim();
@@ -81,6 +94,12 @@ async function brainCommand(text) {
 
 async function askBrain(messages, options = {}) {
   const { mode = "dost", notes = "", signal } = options;
+  const latestUserMessage = [...messages].reverse().find((message) => message?.role !== "assistant");
+  const founder = founderAnswer(latestUserMessage?.content);
+
+  if (founder) {
+    return { text: founder, err: null };
+  }
 
   try {
     const response = await fetch(`${WORKER_URL}/api/chat`, {
