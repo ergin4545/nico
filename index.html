@@ -35,10 +35,11 @@
     }
 
     * { box-sizing: border-box; }
-    html { min-height: 100%; background: var(--bg); }
+    html { min-height: 100%; height: 100%; background: var(--bg); }
     body {
-      min-height: 100vh;
-      min-height: 100dvh;
+      height: 100vh;
+      height: 100dvh;
+      min-height: 0;
       margin: 0;
       overflow: hidden;
       color: var(--text);
@@ -53,8 +54,9 @@
     button { border: 0; }
     button:focus-visible, input:focus-visible { outline: 3px solid rgba(167, 216, 255, .7); outline-offset: 3px; }
     .app-shell {
-      min-height: 100vh;
-      min-height: 100dvh;
+      height: 100vh;
+      height: 100dvh;
+      min-height: 0;
       display: grid;
       grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
       gap: 18px;
@@ -62,6 +64,8 @@
     }
 
     .sidebar, .workspace {
+      min-height: 0;
+      max-height: 100%;
       border: 1px solid var(--border);
       box-shadow: var(--shadow);
       backdrop-filter: blur(18px);
@@ -151,6 +155,8 @@
       flex-direction: column;
       min-width: 0;
       min-height: 0;
+      height: 100%;
+      max-height: 100%;
       overflow: hidden;
       border-radius: var(--radius-lg);
       background: rgba(11, 14, 25, .74);
@@ -159,6 +165,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex-wrap: wrap;
       gap: 16px;
       min-height: 74px;
       padding: 14px 22px;
@@ -197,14 +204,19 @@
     .icon { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
     .chat-scroll {
-      flex: 1;
+      flex: 1 1 auto;
+      height: 0;
       min-height: 0;
       overflow-y: auto;
+      overflow-x: hidden;
       overscroll-behavior: contain;
-      scrollbar-color: rgba(144, 150, 200, .32) transparent;
+      touch-action: pan-y;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-gutter: stable;
+      scrollbar-color: rgba(144, 150, 200, .5) transparent;
       scrollbar-width: thin;
     }
-    .chat-inner { width: min(100%, 920px); margin: 0 auto; padding: 34px 30px 22px; }
+    .chat-inner { width: min(100%, 920px); min-height: 100%; margin: 0 auto; padding: 34px 30px 22px; }
     .welcome { display: grid; gap: 20px; padding: min(10vh, 90px) 0 32px; }
     .welcome[hidden] { display: none; }
     .eyebrow { margin: 0; color: var(--accent-strong); font-family: "DM Mono", monospace; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
@@ -298,7 +310,8 @@
     @media (max-width: 900px) {
       .app-shell { display: block; padding: 0; }
       .sidebar { display: none; }
-      .workspace { min-height: 100vh; min-height: 100dvh; border: 0; border-radius: 0; box-shadow: none; }
+      .app-shell { height: 100vh; height: 100dvh; min-height: 0; }
+      .workspace { height: 100vh; height: 100dvh; min-height: 0; max-height: 100dvh; border: 0; border-radius: 0; box-shadow: none; }
       .workspace-header { min-height: 66px; padding: 12px 16px; }
       .mobile-logo { display: block; }
       .chat-inner { padding: 24px 16px 16px; }
@@ -307,7 +320,9 @@
       .attachment-tray { padding: 0 12px 10px; }
     }
     @media (max-width: 560px) {
-      .header-actions .control-button:not(.icon-button) { display: none; }
+      .workspace-header { align-items: stretch; flex-direction: column; gap: 10px; }
+      .header-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; gap: 8px; }
+      .header-actions .control-button, .header-actions .icon-button { width: 100%; min-height: 42px; padding: 0 8px; }
       .prompt-grid { grid-template-columns: 1fr; }
       .welcome h1 { font-size: 32px; }
       .message-bubble { max-width: calc(100% - 38px); font-size: 13px; }
@@ -335,7 +350,7 @@
 
       <div class="privacy-note">
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>
-        <span>Sohbet geçmişin bu cihazda saklanır. Yeni sohbet ile geçmişi istediğin zaman temizleyebilirsin.</span>
+        <span>Kalıcı hafıza ve sohbet geçmişi bu cihazda saklanır. Yeni sohbet geçmişi temizler; hafızan korunur.</span>
       </div>
 
       <section class="sidebar-section" aria-labelledby="capabilities-title">
@@ -361,10 +376,12 @@
           </div>
         </div>
         <div class="header-actions">
+          <button id="memory-button" class="control-button" type="button" title="Kalıcı hafızayı görüntüle">Hafıza 0</button>
           <button id="mode-toggle" class="control-button" type="button" aria-pressed="false" title="Yanıt tarzını değiştir">Dost modu</button>
           <button id="tts" class="control-button" type="button" aria-pressed="false" title="NICO yanıtlarını seslendir">Ses kapalı</button>
-          <button id="clear-chat" class="control-button icon-button" type="button" aria-label="Yeni sohbet başlat" title="Yeni sohbet başlat">
+          <button id="clear-chat" class="control-button" type="button" aria-label="Yeni sohbet başlat" title="Yeni sohbet başlat">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+            <span>Yeni sohbet</span>
           </button>
         </div>
       </header>
@@ -380,6 +397,7 @@
               <button class="prompt-card" type="button" data-prompt="Bir web projesinin kullanıcı deneyimini nasıl iyileştirebilirim?"><strong>Fikir üretelim</strong><span>Bir sorunu birlikte açalım.</span></button>
               <button class="prompt-card" type="button" data-prompt="hava İstanbul"><strong>Hava durumuna bak</strong><span>Şehir adını değiştirerek sor.</span></button>
               <button class="prompt-card" type="button" data-prompt="Kodumda bir hatayı bulmama yardım et. Önce neye bakmalıyım?"><strong>Kod konusunda yardım</strong><span>Hatanı veya kodunu gönder.</span></button>
+              <button class="prompt-card" type="button" data-prompt="Biraz muhabbet edelim. Bugün nasılsın NICO?"><strong>Muhabbet edelim</strong><span>Serbestçe konuşmaya başla.</span></button>
             </div>
           </section>
           <div id="chat" class="messages" aria-live="polite" aria-relevant="additions"></div>
@@ -401,7 +419,7 @@
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
           </button>
         </div>
-        <p class="composer-note">Enter ile gönder. Görsel ekleyebilir, sesle yazabilir ve yanıtları sesli dinleyebilirsin.</p>
+        <p class="composer-note">Enter ile gönder. Görsel ekleyebilir, sesle yazabilir, NICO ile serbestçe konuşabilir ve `hatırla ...` ile kalıcı hafıza ekleyebilirsin.</p>
       </div>
     </main>
   </div>
