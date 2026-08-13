@@ -1,6 +1,7 @@
 const STORAGE_KEYS = {
   history: "nico_history_v2",
   notes: "nico_notes_v2",
+  memories: "nico_memories_v1",
   budget: "nico_budget_v2",
   tts: "nico_tts_v2",
   mode: "nico_mode_v2"
@@ -15,6 +16,7 @@ const fileInput = document.getElementById("file");
 const micButton = document.getElementById("mic");
 const ttsButton = document.getElementById("tts");
 const modeButton = document.getElementById("mode-toggle");
+const memoryButton = document.getElementById("memory-button");
 const clearButton = document.getElementById("clear-chat");
 const welcomePanel = document.getElementById("welcome-panel");
 const attachmentTray = document.getElementById("attachment-tray");
@@ -23,11 +25,13 @@ const statusText = document.getElementById("status-text");
 
 let history = loadJson(STORAGE_KEYS.history, migrateHistory());
 let notes = loadJson(STORAGE_KEYS.notes, []);
+let memories = loadJson(STORAGE_KEYS.memories, migrateMemories(notes));
 let budget = loadJson(STORAGE_KEYS.budget, []);
 let pendingImage = null;
 let isSending = false;
 let ttsEnabled = localStorage.getItem(STORAGE_KEYS.tts) === "1";
 let mode = localStorage.getItem(STORAGE_KEYS.mode) || "dost";
+let shouldFollowConversation = true;
 
 function loadJson(key, fallback) {
   try {
@@ -51,10 +55,76 @@ function migrateHistory() {
   }
 }
 
+function migrateMemories(legacyNotes) {
+  return legacyNotes
+    .filter((note) => typeof note === "string" && note.trim())
+    .map((note) => ({
+      id: `legacy-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      content: note.trim(),
+      createdAt: Date.now()
+    }))
+    .slice(-50);
+}
+
 function saveState() {
   localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(history.slice(-40)));
-  localStorage.setItem(STORAGE_KEYS.notes, JSON.stringify(notes.slice(-20)));
+  localStorage.setItem(STORAGE_KEYS.memories, JSON.stringify(memories.slice(-50)));
+  notes = memories.slice(-20).map((memory) => memory.content);
+  localStorage.setItem(STORAGE_KEYS.notes, JSON.stringify(notes));
   localStorage.setItem(STORAGE_KEYS.budget, JSON.stringify(budget.slice(-100)));
+}
+
+function normaliseMemory(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function updateMemoryButton() {
+  if (!memoryButton) return;
+  memoryButton.textContent = `Hafıza ${memories.length}`;
+  memoryButton.setAttribute("aria-label", `${memories.length} kalıcı hafıza kaydını görüntüle`);
+}
+
+function addMemory(content) {
+  const clean = normaliseMemory(content);
+  if (!clean) return { ok: false, message: "Hatırlamam için kaydetmek istediğin bilgiyi de yazmalısın." };
+  if (clean.length > 280) return { ok: false, message: "Kalıcı hafıza kaydı en fazla 280 karakter olmalı." };
+
+  const duplicate = memories.find((memory) => memory.content.toLocaleLowerCase("tr-TR") === clean.toLocaleLowerCase("tr-TR"));
+  if (duplicate) return { ok: false, message: "Bu bilgi zaten kalıcı hafızamda kayıtlı." };
+
+  memories.unshift({
+    id: globalThis.crypto?.randomUUID?.() || `memory-${Date.now()}`,
+    content: clean,
+    createdAt: Date.now()
+  });
+  memories = memories.slice(0, 50);
+  saveState();
+  updateMemoryButton();
+  return { ok: true, message: "Bunu kalıcı hafızama ekledim. Bu cihazda NICO’yu yeniden açtığında da hatırlayacağım." };
+}
+
+function forgetMemory(query) {
+  const clean = normaliseMemory(query).toLocaleLowerCase("tr-TR");
+  if (!clean) return "Silmek istediğin hafıza kaydını yazmalısın.";
+
+  const index = memories.findIndex((memory) => memory.content.toLocaleLowerCase("tr-TR").includes(clean));
+  if (index === -1) return "Bu ifadeyle eşleşen bir hafıza kaydı bulamadım.";
+
+  const [removed] = memories.splice(index, 1);
+  saveState();
+  updateMemoryButton();
+  return `“${removed.content}” kaydını hafızamdan sildim.`;
+}
+
+function getMemorySummary() {
+  if (!memories.length) return "Kalıcı hafızamda henüz kayıt yok. `hatırla ...` yazarak bir bilgiyi bu cihazda saklayabilirsin.";
+  const lines = memories.slice(0, 12).map((memory, index) => `${index + 1}. ${memory.content}`);
+  const more = memories.length > 12 ? `\n\nToplam ${memories.length} kayıt var; ilk 12 kayıt gösteriliyor.` : "";
+  return `**Kalıcı hafıza — ${memories.length} kayıt**\n\n${lines.join("\n")}${more}\n\nBir kaydı silmek için: \`unut kayıt metni\``;
+}
+
+function getMemoryContext() {
+  return memories.slice(0, 20).map((memory) => memory.content).join(" | ");
 }
 
 function escapeHtml(value) {
@@ -104,7 +174,13 @@ function renderMarkdown(text) {
   return html.replace(/@@CODE_(\d+)@@/g, (_, index) => codeBlocks[Number(index)] || "");
 }
 
-function scrollToLatest() {
+function isNearConversationEnd() {
+  const remaining = chatScroll.scrollHeight - chatScroll.scrollTop - chatScroll.clientHeight;
+  return remaining < 96;
+}
+
+function scrollToLatest(force = false) {
+  if (!force && !shouldFollowConversation) return;
   requestAnimationFrame(() => {
     chatScroll.scrollTo({ top: chatScroll.scrollHeight, behavior: "smooth" });
   });
@@ -128,7 +204,7 @@ function createIconLetter() {
 }
 
 function addMessage(content, role = "assistant", options = {}) {
-  const { save = false, media = null } = options;
+  const { save = false, media = null, forceScroll = false } = options;
   hideWelcome();
 
   const row = document.createElement("article");
@@ -158,7 +234,7 @@ function addMessage(content, role = "assistant", options = {}) {
 
   row.appendChild(bubble);
   chat.appendChild(row);
-  scrollToLatest();
+  scrollToLatest(forceScroll);
 
   if (save && content) {
     history.push({ role, content });
@@ -275,12 +351,36 @@ function handleLocalCommand(text) {
   const trimmed = text.trim();
   const lower = trimmed.toLocaleLowerCase("tr-TR");
 
-  const noteMatch = trimmed.match(/^(?:nico\s+not:|not al|bunu böyle yap)\s+(.+)/i);
-  if (noteMatch) {
-    notes.push(noteMatch[1].trim());
-    notes = notes.slice(-20);
+  if (/^(selam|merhaba|selamlar|sa|hey nico)[!?.\s]*$/i.test(trimmed)) {
+    return "Selam! Buradayım. İstersen günün nasıl geçtiğini konuşalım, istersen birlikte bir şeyi çözelim.";
+  }
+
+  if (/^(nasılsın|naber|ne haber)[!?.\s]*$/i.test(trimmed)) {
+    return "İyiyim, teşekkür ederim. Seninle konuşmaya ve yardımcı olmaya hazırım. Sen nasılsın?";
+  }
+
+  if (/(muhabbet edelim|sohbet edelim|biraz konuşalım|sıkıldım|canım sıkılıyor)/i.test(lower)) {
+    return "Olur, biraz muhabbet edelim. Bugün aklında en çok kalan şey neydi?";
+  }
+
+  if (/(teşekkür|sağ ol|eyvallah)/i.test(lower)) {
+    return "Rica ederim. Ne zaman istersen buradayım.";
+  }
+
+  const rememberMatch = trimmed.match(/^(?:hatırla|hafızana\s+kaydet|kalıcı\s+hafızaya\s+ekle|nico\s+not:|not al|bunu böyle yap)\s*[:,-]?\s*(.+)$/i);
+  if (rememberMatch) return addMemory(rememberMatch[1]).message;
+
+  const forgetMatch = trimmed.match(/^(?:unut|hafızadan\s+sil)\s*[:,-]?\s*(.+)$/i);
+  if (forgetMatch) return forgetMemory(forgetMatch[1]);
+
+  if (lower === "hafıza" || lower === "hafızam" || lower === "hafızayı göster") return getMemorySummary();
+
+  if (lower === "hafızayı temizle" || lower === "tüm hafızayı sil") {
+    if (!memories.length) return "Kalıcı hafızam zaten boş.";
+    memories = [];
     saveState();
-    return "Notunu kaydettim. Sonraki sohbetlerde bunu dikkate alacağım.";
+    updateMemoryButton();
+    return "Kalıcı hafızamdaki tüm kayıtları sildim.";
   }
 
   const moneyMatch = lower.match(/^(gelir|gider)\s+(\d+(?:[.,]\d+)?)/);
@@ -303,7 +403,7 @@ function handleLocalCommand(text) {
   }
 
   if (lower === "yardım" || lower === "komutlar") {
-    return "**Kısa komutlar**\n\n- `hava İstanbul` — anlık hava durumu\n- `ara yapay zekâ` — kısa bilgi araması\n- `not al ...` — not kaydetme\n- `gelir 1200` veya `gider 450` — bütçe kaydı\n- `bütçe` — bütçe özeti\n- `hatırlat 18:30 toplantı` — bu oturum için hatırlatma";
+    return "**Kısa komutlar**\n\n- `hava İstanbul` — anlık hava durumu\n- `ara yapay zekâ` — kısa bilgi araması\n- `hatırla ...` — bu cihazdaki kalıcı hafızaya ekle\n- `hafıza` — kayıtlı hafızaları göster\n- `unut ...` — bir hafıza kaydını sil\n- `not al ...` — kalıcı hafızaya not ekle\n- `gelir 1200` veya `gider 450` — bütçe kaydı\n- `bütçe` — bütçe özeti\n- `hatırlat 18:30 toplantı` — bu oturum için hatırlatma";
   }
 
   return null;
@@ -348,7 +448,7 @@ async function sendMessage(prefilled = "") {
   input.value = "";
 
   if (localCommand) {
-    addMessage(text, "user", { save: true });
+    addMessage(text, "user", { save: true, forceScroll: true });
     addMessage(localCommand, "assistant", { save: true });
     if (ttsEnabled) speak(localCommand);
     setStatus("Hazır", "online");
@@ -362,7 +462,7 @@ async function sendMessage(prefilled = "") {
     ? [{ type: "text", text: userLabel }, { type: "image_url", image_url: { url: attachment.dataUrl } }]
     : text;
 
-  addMessage(userLabel, "user", { media: attachment?.dataUrl || null });
+  addMessage(userLabel, "user", { media: attachment?.dataUrl || null, forceScroll: true });
   history.push({ role: "user", content: attachment ? `${userLabel}\n[Görsel eklendi]` : text });
   history = history.slice(-40);
   saveState();
@@ -379,7 +479,7 @@ async function sendMessage(prefilled = "") {
     const directAnswer = attachment ? null : await brainCommand(text);
     const result = directAnswer
       ? { text: directAnswer, err: null }
-      : await askBrain(buildConversation(content), { mode, notes: notes.join(" | "), signal: controller.signal });
+      : await askBrain(buildConversation(content), { mode, notes: getMemoryContext(), signal: controller.signal });
 
     removeTyping();
     const reply = result.text || result.err || "NICO şu anda yanıt üretemedi.";
@@ -483,6 +583,10 @@ modeButton.addEventListener("click", () => {
   setStatus(mode === "asistan" ? "Asistan modu" : "Dost modu", "online");
 });
 
+memoryButton?.addEventListener("click", () => {
+  addMessage(getMemorySummary(), "assistant", { forceScroll: true });
+});
+
 clearButton.addEventListener("click", () => {
   history = [];
   saveState();
@@ -499,7 +603,11 @@ document.querySelectorAll(".prompt-card").forEach((card) => {
 });
 
 window.speechSynthesis?.addEventListener?.("voiceschanged", () => {});
+chatScroll.addEventListener("scroll", () => {
+  shouldFollowConversation = isNearConversationEnd();
+}, { passive: true });
 updateTtsButton();
 updateModeButton();
+updateMemoryButton();
 initialiseHistory();
 setStatus("Hazır", "online");
